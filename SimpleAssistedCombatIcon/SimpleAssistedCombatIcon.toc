@@ -4,7 +4,7 @@
 ## Category: Combat
 ## Title: Simple Assisted Combat Icon
 ## Notes: A simple icon to display the current recommended ability from Blizzards Assisted Combat API.
-## Author: Katur239
+## Author: Katur239, Senoy
 ## Version: 12.1.5.1
 ## SavedVariables: SCAIDB
 
