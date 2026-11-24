@@ -70,8 +70,10 @@ local function IsRotationalSpell(spellID)
 end
 
 local function SafeSetShown(frame, shown)
-    local success = pcall(frame.SetShown, frame, addon.db.profile.fadeOutHide or shown)
-    local minAlpha = addon.db.profile.fadeOutHide and addon.db.profile.fadeOutAlpha or 0
+    -- Fading only stands in for hiding while enabled; a disabled icon must really hide.
+    local fade = addon.db.profile.enabled and addon.db.profile.fadeOutHide
+    local success = pcall(frame.SetShown, frame, fade or shown)
+    local minAlpha = fade and addon.db.profile.fadeOutAlpha or 0
     local maxAlpha = addon.db.profile.alpha or 1
     frame:SetAlpha(shown and maxAlpha or minAlpha)
     return success
@@ -522,6 +524,10 @@ function AssistedCombatIconMixin:OnLoad()
 
     self.spellID = 61304
     self.updateInterval = tonumber(C_CVar.GetCVar("assistedCombatIconUpdateRate")) or 0.25
+    -- CVars may not be loaded yet here, and can finish loading after PLAYER_LOGIN.
+    EventUtil.ContinueOnVariablesLoaded(function()
+        self:SetUpdateInterval(tonumber(C_CVar.GetCVar("assistedCombatIconUpdateRate")))
+    end)
     self.isDefaultUI = true
     self.lastTickTime = GetTime()
 
@@ -640,7 +646,7 @@ function AssistedCombatIconMixin:OnEvent(event, ...)
     elseif event == "CVAR_UPDATE" then 
         local arg1, arg2 = ...
         if arg1 =="assistedCombatIconUpdateRate" then
-            self.updateInterval = tonumber(arg2) or self.updateInterval
+            self:SetUpdateInterval(tonumber(arg2))
         end
     end
 end
@@ -661,6 +667,18 @@ function AssistedCombatIconMixin:Stop()
 
     self.ticker:Cancel()
     self.ticker = nil
+end
+
+function AssistedCombatIconMixin:SetUpdateInterval(interval)
+    if not interval or interval == self.updateInterval then return end
+
+    self.updateInterval = interval
+
+    if self.ticker then
+        self.ticker:Cancel()
+        self.ticker = nil
+        self:Start()
+    end
 end
 
 function AssistedCombatIconMixin:IsTickerStalled()
@@ -737,7 +755,7 @@ function AssistedCombatIconMixin:UpdateVisibility()
         then
             self:SetVisible(false)
         else
-            self:SetVisible(db.position.parentFrame ~= "__nameplate" or nameplate)
+            self:SetVisible(true)
         end
     else
         local show = (display.HOSTILE_TARGET and UnitCanAttack("player", "anyenemy") and not UnitIsDead("target"))
@@ -749,8 +767,7 @@ function AssistedCombatIconMixin:UpdateVisibility()
                   or (display.HideAsHealer and UnitGroupRolesAssigned("player") == "HEALER")
                   or (display.HideOnMount and IsMountedLocal())
 
-        self:SetVisible(show and not hide
-            and (db.position.parentFrame ~= "__nameplate" or nameplate))
+        self:SetVisible(show and not hide)
     end
 end
 
